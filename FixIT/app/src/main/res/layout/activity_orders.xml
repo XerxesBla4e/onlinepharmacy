@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".Patient.OrdersActivity"
+    android:orientation="vertical">
+
+    <!-- CardView with total -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Total: 1000.00Shs"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:id="@+id/total"
+            android:textSize="25sp" />
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        tools:listitem="@layout/medicine_view_item"
+        android:layout_weight="1"
+        android:padding="8dp" />
+
+    <!-- MaterialButton for ordering -->
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:backgroundTint="@color/greyish"
+        android:text="Order"
+        android:id="@+id/orderButton"
+        android:textSize="18sp" />
+
+</LinearLayout>
