@@ -33,7 +33,7 @@ public class MedicineOrdersAdapter extends ListAdapter<Medicine, MedicineOrdersA
         public boolean areContentsTheSame(@NonNull Medicine oldItem, @NonNull Medicine newItem) {
             return oldItem.getMName().equals(newItem.getMName())
                     && oldItem.getMCategory().equals(newItem.getMCategory())
-                    && oldItem.getMPrice() == newItem.getMPrice()
+                    && oldItem.getMPrice().equals(newItem.getMPrice())
                     && oldItem.getMId().equals(newItem.getMId())
                     && oldItem.getMTimestamp().equals(newItem.getMTimestamp())
                     && oldItem.getMUid().equals(newItem.getMUid())
@@ -76,7 +76,20 @@ public class MedicineOrdersAdapter extends ListAdapter<Medicine, MedicineOrdersA
             mNameTextView.setText(medicine.getMName());
             mCategoryTextView.setText(medicine.getMCategory());
             mPriceTextView.setText(String.valueOf(medicine.getMPrice()));
-            Picasso.get().load(medicine.getMImage()).into(mImageView);
+            String imagePath = medicine.getMImage();
+            try {
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    Picasso.get().load(imagePath).into(mImageView);
+                } else {
+                    // Load a default image from the mipmap folder
+                    mImageView.setImageResource(R.mipmap.ic_launcher);
+                }
+            } catch (IllegalArgumentException e) {
+                // Exception occurred, handle it
+                e.printStackTrace();
+                // Load a default image from the mipmap folder
+              //  mImageView.setImageResource(R.mipmap.ic_launcher);
+            }
         }
     }
 }

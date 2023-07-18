@@ -47,7 +47,7 @@ public class PharmacyActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phoneNumber))));
-                Toast.makeText(getApplicationContext(), "" + phoneNumber, Toast.LENGTH_SHORT).show();
+              //  Toast.makeText(getApplicationContext(), "" + phoneNumber, Toast.LENGTH_SHORT).show();
             }
         });
 

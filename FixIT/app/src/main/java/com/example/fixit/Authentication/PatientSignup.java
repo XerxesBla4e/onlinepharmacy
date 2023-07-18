@@ -41,13 +41,16 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -59,6 +62,7 @@ import java.util.Map;
 public class PatientSignup extends AppCompatActivity {
 
     ActivityPatientSignupBinding activityPatientSignupBinding;
+    public static final int PERMISSION_REQUEST_CODE = 444;
     DatePicker datePicker;
     String date, name, age, email, phonenumber, location, password, repass, gender;
     String district, city, state, country, address;
@@ -76,7 +80,7 @@ public class PatientSignup extends AppCompatActivity {
     LocationRequest locationRequest;
     LocationCallback locationCallback;
     LocationManager locationManager;
-    LocationListener locationListener;
+    public LocationListener locationListener;
     private static int UPDATE_INTERVAL = 5000;
     String userId;
     FirebaseUser firebaseUser;
@@ -84,6 +88,7 @@ public class PatientSignup extends AppCompatActivity {
     private static final int MY_PERMISSION_REQUEST_CODE = 71;
 
     private static final String TAG = "dd";
+    String token;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,8 +101,8 @@ public class PatientSignup extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
         mAuth = FirebaseAuth.getInstance();
-     //   firebaseUser = mAuth.getCurrentUser();
-     //   userId =firebaseUser.getUid();
+        //   firebaseUser = mAuth.getCurrentUser();
+        //   userId =firebaseUser.getUid();
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         locationRequest = LocationRequest.create();
@@ -197,9 +202,22 @@ public class PatientSignup extends AppCompatActivity {
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION
             }, MY_PERMISSION_REQUEST_CODE);
-        } else {
-            // displayLocation();
         }
+
+        FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(new OnCompleteListener<String>() {
+                    @Override
+                    public void onComplete(@NonNull Task<String> task) {
+                        if (!task.isSuccessful()) {
+                            Log.w(TAG, "Fetching FCM registration token failed", task.getException());
+                            return;
+                        }
+                        token = task.getResult();
+                        // hashMap = new HashMap<>();
+                        //   hashMap.put("Token", "" + token);
+                        Log.d(TAG, "XerToken:" + token);
+                    }
+                });
 
     }
 
@@ -207,7 +225,7 @@ public class PatientSignup extends AppCompatActivity {
         final String timestamp = String.valueOf(System.currentTimeMillis());
 
         Map<String, Object> user = new HashMap<>();
-        user.put("uid",uid);
+        user.put("uid", uid);
         user.put("name", name);
         user.put("age", age);
         user.put("email", email);
@@ -223,7 +241,8 @@ public class PatientSignup extends AppCompatActivity {
         user.put("latitude", "" + longitude);
         user.put("longitude", "" + latitude);
         user.put("accounttype", "Patient");
-        user.put("online", "true");//bringing bolean
+        user.put("online", "true");
+        user.put("token", token);
 
         db.collection("users")
                 .document(uid)
@@ -256,6 +275,7 @@ public class PatientSignup extends AppCompatActivity {
         linearLayout = activityPatientSignupBinding.PatientLinLayout;
         adminSignup = activityPatientSignupBinding.adminSignup;
     }
+
     private boolean validateFields() {
         String noSpecialChars = "\\A[A-Za-z]{4,20}\\z";
         String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
@@ -376,28 +396,48 @@ public class PatientSignup extends AppCompatActivity {
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
     }
 
-    @SuppressLint("MissingPermission")
     private void startLegacyLocationUpdates() {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
+            locationListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    longitude = location.getLongitude();
+                    latitude = location.getLatitude();
+                    getLocationAddress(longitude, latitude);
+                }
+            };
+
+            // Request location updates
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+                // Request the missing permissions from the user
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_CODE);
+                return;
+            }
+
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
         } else {
             Toast.makeText(getApplicationContext(), "Location Services Are Disabled\nPlease enable GPS or " +
                     "network provider", Toast.LENGTH_LONG).show();
         }
+    }
 
-        locationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                longitude = location.getLongitude();
-                latitude = location.getLatitude();
-
-                getLocationAddress(longitude, latitude);
+    // Override the onRequestPermissionsResult() method to handle the permission request result
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, request location updates again
+                startLegacyLocationUpdates();
+            } else {
+                // Permission denied, handle it accordingly (e.g., show a message to the user)
+                Toast.makeText(getApplicationContext(), "Location permission denied", Toast.LENGTH_LONG).show();
             }
-
-        };
-
+        }
     }
 
     private void getLocationAddress(Double longitude, Double latitude) {
@@ -406,7 +446,6 @@ public class PatientSignup extends AppCompatActivity {
             List<Address> addressList = geocoder.getFromLocation(latitude, longitude, 1);
             address = addressList.get(0).getAddressLine(0);
 
-           // Toast.makeText(getApplicationContext(), "Address: " + address, Toast.LENGTH_SHORT).show();
             activityPatientSignupBinding.etLocation.setText(address);
             city = addressList.get(0).getLocality();//city
             state = addressList.get(0).getAdminArea();//region
@@ -419,7 +458,7 @@ public class PatientSignup extends AppCompatActivity {
     }
 
     private void stopLocationUpdates() {
-       // fusedLocationProviderClient.removeLocationUpdates(locationCallback);
+        // fusedLocationProviderClient.removeLocationUpdates(locationCallback);
     }
 
     @Override
@@ -434,8 +473,9 @@ public class PatientSignup extends AppCompatActivity {
         startActivity(intent);
         // super.onBackPressed();
         // Finish the current activity
-       // finish();
+        // finish();
     }
+
     @Override
     protected void onStart() {
         super.onStart();

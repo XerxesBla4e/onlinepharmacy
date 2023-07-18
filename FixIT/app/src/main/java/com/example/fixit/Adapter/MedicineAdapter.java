@@ -86,7 +86,21 @@ public class MedicineAdapter extends ListAdapter<Medicinecart, MedicineAdapter.M
             nameTextView.setText(medicinecart.getMName());
             categoryTextView.setText(medicinecart.getMCategory());
             priceTextView.setText(medicinecart.getMPrice());
-            Picasso.get().load(medicinecart.getMImage()).into(imageView);
+            String imagePath = medicinecart.getMImage();
+           // Picasso.get().load(medicinecart.getMImage()).into(imageView);
+            try {
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    Picasso.get().load(imagePath).into(imageView);
+                } else {
+                    // Load a default image from the mipmap folder
+                    imageView.setImageResource(R.mipmap.ic_launcher);
+                }
+            } catch (IllegalArgumentException e) {
+                // Exception occurred, handle it
+                e.printStackTrace();
+                // Load a default image from the mipmap folder
+                imageView.setImageResource(R.mipmap.ic_launcher);
+            }
         }
 
         @Override

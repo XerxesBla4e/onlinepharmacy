@@ -84,6 +84,9 @@ public class AddDoctorActivity extends AppCompatActivity {
                     progressBar.setVisibility(View.VISIBLE);
 
                     ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    if (progressBar.getParent() != null) {
+                        ((ViewGroup) progressBar.getParent()).removeView(progressBar);
+                    }
                     linearLayout.addView(progressBar, layoutParams);
 
                     uploadDoctorInfo();
@@ -135,7 +138,7 @@ public class AddDoctorActivity extends AppCompatActivity {
                         @Override
                         public void onSuccess(Void aVoid) {
                             progressBar.setVisibility(View.GONE);
-                            Toast.makeText(getApplicationContext(), "Medicine Added...", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getApplicationContext(), "Doctor Added...", Toast.LENGTH_SHORT).show();
                         }
                     })
                     .addOnFailureListener(new OnFailureListener() {
@@ -169,13 +172,13 @@ public class AddDoctorActivity extends AppCompatActivity {
 
 
                             DocumentReference userRef = firestore.collection("users").document(uid);
-                            userRef.collection("Medicine").document(timestamp).set(hashMap)
+                            userRef.collection("Doctor").document(timestamp).set(hashMap)
                                     .addOnSuccessListener(new OnSuccessListener<Void>() {
                                         @Override
                                         public void onSuccess(Void aVoid) {
                                             //  progressDialog.dismiss();
                                             progressBar.setVisibility(View.GONE);
-                                            Toast.makeText(getApplicationContext(), "Medicine Added...", Toast.LENGTH_SHORT).show();
+                                            Toast.makeText(getApplicationContext(), "Doctor Added...", Toast.LENGTH_SHORT).show();
                                         }
                                     })
                                     .addOnFailureListener(new OnFailureListener() {

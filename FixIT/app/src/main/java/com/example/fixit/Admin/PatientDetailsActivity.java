@@ -17,6 +17,7 @@ import android.widget.Toast;
 
 import com.example.fixit.Adapter.MedicineOrdersAdapter;
 import com.example.fixit.Authentication.LoginActivity;
+import com.example.fixit.FCMSend;
 import com.example.fixit.Model.Medicine;
 import com.example.fixit.Model.Medicinecart;
 import com.example.fixit.Model.Orders;
@@ -47,6 +48,7 @@ public class PatientDetailsActivity extends AppCompatActivity {
 
     Orders ordersModel;
     List<Medicine> medicineList;
+    String notpatienttoken;
 
     MedicineOrdersAdapter medicineOrdersAdapter;
     FirebaseFirestore firestore;
@@ -70,8 +72,6 @@ public class PatientDetailsActivity extends AppCompatActivity {
         firebaseUser = firebaseAuth.getCurrentUser();
         if (firebaseUser != null) {
             id = firebaseUser.getUid();
-        } else {
-       //     startActivity(new Intent(getApplicationContext(), LoginActivity.class));
         }
 
         RetrievePersonalDets();
@@ -106,10 +106,9 @@ public class PatientDetailsActivity extends AppCompatActivity {
                         for (DocumentSnapshot document : querySnapshot.getDocuments()) {
                             // Convert the document snapshot to a MedicineOrder object
                             Medicine medicineOrder = document.toObject(Medicine.class);
-
-                            if (medicineOrder.getMPrice() != 0.0) {
-                                total += medicineOrder.getMPrice();
-                            }
+                            String medicineMPrice1 = medicineOrder.getMPrice();
+                            double mPrice = Double.parseDouble(medicineMPrice1);
+                            total += mPrice;
                             // Do something with the medicine object
                             medicineList.add(medicineOrder);
                         }
@@ -178,7 +177,7 @@ public class PatientDetailsActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(Void unused) {
                         Toast.makeText(getApplicationContext(), "Order is now " + message, Toast.LENGTH_SHORT).show();
-                        //   prepareNotificationMessage(orderID, message);
+                        prepareNotificationMessage(message);
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
@@ -190,54 +189,49 @@ public class PatientDetailsActivity extends AppCompatActivity {
 
     }
 
+    private void prepareNotificationMessage(String message) {
+        if (notpatienttoken != null) {
+            FCMSend.pushNotification(
+                    PatientDetailsActivity.this,
+                    notpatienttoken,
+                    "Status Update",
+                    message
+            );
+        }
+    }
+
     private void RetrievePersonalDets() {
-        DocumentReference userRef = firestore.collection("users").document(OrderBy);
+        if (OrderBy != null) {
+            DocumentReference userRef = firestore.collection("users").document(OrderBy);
 
-        userRef.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-            @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if (task.isSuccessful()) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document.exists()) {
-                        // User document exists, retrieve the data
-                        UserDets user = document.toObject(UserDets.class);
+            userRef.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                @Override
+                public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                    if (task.isSuccessful()) {
+                        DocumentSnapshot document = task.getResult();
+                        if (document.exists()) {
+                            // User document exists, retrieve the data
+                            UserDets user = document.toObject(UserDets.class);
 
-                        // Access the user properties
-                        String uid = user.getUid();
-                        String name = user.getName();
-                        String age = user.getAge();
-                        String email = user.getEmail();
-                        String phoneNumber = user.getPhonenumber();
-                        String location = user.getLocation();
-                        location1.setText(location);
-                        String city = user.getCity();
-                        String state = user.getState();
-                        String country = user.getCountry();
-                        String district = user.getDistrict();
-                        String gender = user.getGender();
-                        String dateOfBirth = user.getDOB();
-                        String timestamp = user.getTimestamp();
-                        String latitude = user.getLatitude();
-                        String longitude = user.getLongitude();
-                        String accountType = user.getAccounttype();
-                        String onlineStatus = user.getOnline();
+                            String location = user.getLocation();
+                            location1.setText(location);
+                            notpatienttoken = user.getToken();
 
-                        // Do something with the retrieved user data
-                        // ...
-
+                        } else {
+                            // User document does not exist
+                            // Handle accordingly
+                            Toast.makeText(getApplicationContext(), "Patient Doesn't Have Personal Info", Toast.LENGTH_SHORT).show();
+                        }
                     } else {
-                        // User document does not exist
-                        // Handle accordingly
-                        Toast.makeText(getApplicationContext(), "Patient Doesn't Have Personal Info", Toast.LENGTH_SHORT).show();
+                        // An error occurred
+                        Exception exception = task.getException();
+                        // Handle the error
                     }
-                } else {
-                    // An error occurred
-                    Exception exception = task.getException();
-                    // Handle the error
                 }
-            }
-        });
-
+            });
+        } else {
+            //Toast.makeText(getApplicationContext(), "Order Doesn't Exist", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void initViews(ActivityPatientDetailsBinding patientDetailsBinding) {
@@ -254,6 +248,7 @@ public class PatientDetailsActivity extends AppCompatActivity {
         recyclerView.setHasFixedSize(true);
         recyclerView.setAdapter(medicineOrdersAdapter);
     }
+
     @Override
     public void onBackPressed() {
         Intent intent = new Intent(getApplicationContext(), AdminMainActivity.class);

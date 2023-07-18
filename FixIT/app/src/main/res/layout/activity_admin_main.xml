@@ -24,21 +24,27 @@
         android:orientation="horizontal"
         android:padding="5dp">
 
-        <com.google.android.material.search.SearchBar
-            android:id="@+id/searchBar"
-            style="@style/CustomSearchBar"
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="3"
-            android:hint="Search Order..."
+            android:queryHint="Search Medicine..."
             app:searchIcon="@drawable/ic_search" />
 
-        <Spinner
-            android:id="@+id/spinner"
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:padding="8dp">
 
+            <Spinner
+                android:id="@+id/spinnerord"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:drawable/btn_dropdown" />
+
+        </FrameLayout>
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -54,9 +60,8 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_alignParentBottom="true"
-        android:elevation="3dp"
-        android:layout_margin="9dp"
         android:background="@drawable/background_bottom_nav"
+        android:elevation="3dp"
         app:itemIconTint="@color/bottom_nav_color"
         app:itemTextColor="@color/bottom_nav_color"
         app:menu="@menu/bottom_nav_menu" />
@@ -71,6 +76,7 @@
         android:layout_marginBottom="70dp"
         android:foregroundGravity="center"
         android:src="@drawable/ic_add1"
+        android:contentDescription="Add Object"
         app:fabCustomSize="40dp" />
 
 </RelativeLayout>

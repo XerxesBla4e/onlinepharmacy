@@ -3,7 +3,7 @@ public class Medicine {
     private String mId;
     private String mName;
     private String mCategory;
-    private double mPrice;
+    private String mPrice;
 
     private String mTimestamp;
     private String mUid;
@@ -15,7 +15,7 @@ public class Medicine {
         // Default constructor required for Firestore deserialization
     }
 
-    public Medicine(String mId, String mName, String mCategory, double mPrice, String mTimestamp, String mUid, String mImage) {
+    public Medicine(String mId, String mName, String mCategory, String mPrice, String mTimestamp, String mUid, String mImage) {
         this.mId = mId;
         this.mName = mName;
         this.mCategory = mCategory;
@@ -49,11 +49,11 @@ public class Medicine {
         this.mCategory = mCategory;
     }
 
-    public double getMPrice() {
+    public String getMPrice() {
         return mPrice;
     }
 
-    public void setMPrice(double mPrice) {
+    public void setMPrice(String mPrice) {
         this.mPrice = mPrice;
     }
 

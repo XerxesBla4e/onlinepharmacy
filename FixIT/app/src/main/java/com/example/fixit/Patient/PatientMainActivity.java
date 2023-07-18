@@ -6,15 +6,22 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Application;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -67,13 +74,15 @@ import java.util.Map;
 public class PatientMainActivity extends AppCompatActivity {
 
     private MedicineViewModel medicineViewModel;
-    private BottomNavigationView bottomNavigationView;
+    BottomNavigationView bottomNavigationView;
     //private RecyclerView transactionRecView;
     private Toolbar toolbar;
     ActivityPatientMainBinding activityPatientMainBinding;
     RecyclerView recyclerView;
     MedicineAdapter medicineAdapter;
     List<Medicinecart> medicineList;
+    private LocationManager locationManager;
+    private LocationListener locationListener;
     FirebaseFirestore fireStore;
     FirebaseAuth firebaseAuth;
     FirebaseUser firebaseUser;
@@ -93,11 +102,20 @@ public class PatientMainActivity extends AppCompatActivity {
         firebaseAuth = FirebaseAuth.getInstance();
         fireStore = FirebaseFirestore.getInstance();
         firebaseUser = firebaseAuth.getCurrentUser();
-        if (firebaseUser != null) {
-            uid1 = firebaseUser.getUid();
-        }
-        // checkUser();
-
+        firebaseAuth.addAuthStateListener(new FirebaseAuth.AuthStateListener() {
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user != null) {
+                    uid1 = user.getUid();
+                    retrieveMedications();
+                    requestLocationUpdates();
+                } else {
+                    startActivity(new Intent(PatientMainActivity.this, LoginActivity.class));
+                    finish();
+                }
+            }
+        });
 
         initBottomNavView();
 
@@ -118,26 +136,61 @@ public class PatientMainActivity extends AppCompatActivity {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setHasFixedSize(true);
-        recyclerView.setAdapter(medicineAdapter);
 
-        // Replace "desiredAccountType" with the account type you want to filter by
-        retrieveMedications();
-        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+    }
 
+    private void requestLocationUpdates() {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new LocationListener() {
             @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
+            public void onLocationChanged(Location location) {
+                updateUserLocation(location.getLatitude(), location.getLongitude());
             }
 
             @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                if (direction == ItemTouchHelper.RIGHT) {
-                    medicineViewModel.delete(medicineAdapter.getMed(viewHolder.getAdapterPosition()));
-                    Toast.makeText(PatientMainActivity.this, "Cart Item deleted", Toast.LENGTH_SHORT).show();
-                } else {
-                }
+            public void onStatusChanged(String provider, int status, Bundle extras) {
             }
-        }).attachToRecyclerView(activityPatientMainBinding.recyclerView);
+
+            @Override
+            public void onProviderEnabled(String provider) {
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+            }
+        };
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        }
+    }
+
+    private void updateUserLocation(double latitude, double longitude) {
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        DocumentReference documentRef = firestore.collection("users").document(uid1);
+
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("latitude", "" + latitude);
+        updateData.put("longitude", "" + longitude);
+
+        documentRef.update(updateData)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        // Update successful
+                        // Toast.makeText(getApplicationContext(), "Location updated", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        //  Log.d(TAG, "" + e);
+                        // Handle any errors
+                        // Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     private void retrieveMedications() {
@@ -166,12 +219,14 @@ public class PatientMainActivity extends AppCompatActivity {
                                             for (QueryDocumentSnapshot medicineDocument : task.getResult()) {
                                                 // Retrieve the medicine data from the document
                                                 Medicinecart medicine = medicineDocument.toObject(Medicinecart.class);
+
                                                 // Add the Medicinecart object to the list
                                                 medicineList.add(medicine);
                                             }
 
                                             // Update the adapter with the retrieved medicine list
                                             medicineAdapter.submitList(medicineList);
+                                            recyclerView.setAdapter(medicineAdapter);
                                         } else {
                                             Log.d("TAG", "Error getting medicines: " + task.getException());
                                         }
@@ -205,7 +260,9 @@ public class PatientMainActivity extends AppCompatActivity {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 String searchQuery = query.trim();
-                String selectedCategory = categorySpinner.getSelectedItem().toString();
+                String selectedCategory = categorySpinner.getSelectedItem() != null
+                        ? categorySpinner.getSelectedItem().toString()
+                        : "";
                 filterMedications(selectedCategory, searchQuery);
                 return true;
             }
@@ -213,11 +270,14 @@ public class PatientMainActivity extends AppCompatActivity {
             @Override
             public boolean onQueryTextChange(String newText) {
                 String searchQuery = newText.trim();
-                String selectedCategory = categorySpinner.getSelectedItem().toString();
+                String selectedCategory = categorySpinner.getSelectedItem() != null
+                        ? categorySpinner.getSelectedItem().toString()
+                        : "";
                 filterMedications(selectedCategory, searchQuery);
                 return true;
             }
         });
+
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -254,8 +314,8 @@ public class PatientMainActivity extends AppCompatActivity {
 
     private void AddtoCart(Medicinecart medicine) {
         Medicinecart medicinecart = new Medicinecart(medicine.getMName(), medicine.getMCategory(),
-                medicine.getMPrice(), medicine.getMId(), medicine.getMTimestamp(),
-                medicine.getMImage(), medicine.getMUid());
+                medicine.getMPrice(), medicine.getMId(), medicine.getMTimestamp(), medicine.getMUid(),
+                medicine.getMImage());
         medicineViewModel.insert(medicinecart);
         Toast.makeText(PatientMainActivity.this, "Cart Item Added Successfully", Toast.LENGTH_SHORT).show();
     }
@@ -270,7 +330,7 @@ public class PatientMainActivity extends AppCompatActivity {
     }
 
     private void initBottomNavView() {
-        bottomNavigationView.setSelectedItemId(R.id.item_home);
+        //bottomNavigationView.setSelectedItemId(R.id.item_home);
         bottomNavigationView.setOnNavigationItemReselectedListener(new BottomNavigationView.OnNavigationItemReselectedListener() {
             @Override
             public void onNavigationItemReselected(MenuItem item) {
@@ -338,7 +398,7 @@ public class PatientMainActivity extends AppCompatActivity {
 
     private void makeOffline() {
         FirebaseFirestore firestore = FirebaseFirestore.getInstance();
-        DocumentReference documentRef = firestore.collection("users").document(firebaseAuth.getUid());
+        DocumentReference documentRef = firestore.collection("users").document(uid1);
 
         Map<String, Object> updateData = new HashMap<>();
         updateData.put("online", "false");
@@ -348,7 +408,7 @@ public class PatientMainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(Void aVoid) {
                         // Update successful
-                        Toast.makeText(getApplicationContext(), "Logged Out", Toast.LENGTH_SHORT).show();
+                        //Toast.makeText(getApplicationContext(), "Logged Out", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
@@ -360,5 +420,13 @@ public class PatientMainActivity extends AppCompatActivity {
                 });
 
     }
-    
+
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        locationManager.removeUpdates(locationListener);
+    }
+
+
 }

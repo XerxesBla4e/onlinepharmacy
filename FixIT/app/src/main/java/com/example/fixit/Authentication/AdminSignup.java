@@ -15,11 +15,13 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,18 +40,20 @@ import com.example.fixit.R;
 import com.example.fixit.databinding.ActivityAdminSignupBinding;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -67,6 +71,7 @@ public class AdminSignup extends AppCompatActivity {
     String district, city, state, country, address;
     //  TextView adminSignup;
     public final static String specialk = "RXONLINE";
+    private static final int PERMISSION_REQUEST_CODE = 444;
     Button buttonSubmit, buttonPickLocale;
     Spinner spinner;
     Double latitude, longitude;
@@ -82,13 +87,14 @@ public class AdminSignup extends AppCompatActivity {
     LocationRequest locationRequest;
     LocationCallback locationCallback;
     LocationManager locationManager;
-    LocationListener locationListener;
+    public LocationListener locationListener;
     private static int UPDATE_INTERVAL = 5000;
     String userId;
     private static int FASTEST_INTERVAL = 3000;
     private static final int MY_PERMISSION_REQUEST_CODE = 71;
 
     private static final String TAG = "dd";
+    String token;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -177,9 +183,20 @@ public class AdminSignup extends AppCompatActivity {
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION
             }, MY_PERMISSION_REQUEST_CODE);
-        } else {
-            // displayLocation();
         }
+
+        FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(new OnCompleteListener<String>() {
+                    @Override
+                    public void onComplete(@NonNull Task<String> task) {
+                        if (!task.isSuccessful()) {
+                            Log.w(TAG, "Fetching FCM registration token failed", task.getException());
+                            return;
+                        }
+                        token = task.getResult();
+                        Log.d(TAG, "XerToken:" + token);
+                    }
+                });
     }
 
     private void initViews(ActivityAdminSignupBinding adminSignupBinding) {
@@ -301,10 +318,7 @@ public class AdminSignup extends AppCompatActivity {
     private void startLocationUpdates() {
         locationCallback = new LocationCallback() {
             @Override
-            public void onLocationResult(LocationResult locationResult) {
-                if (locationResult == null) {
-                    return;
-                }
+            public void onLocationResult(@NonNull LocationResult locationResult) {
                 for (Location location : locationResult.getLocations()) {
                     longitude = location.getLongitude();
                     latitude = location.getLatitude();
@@ -321,28 +335,48 @@ public class AdminSignup extends AppCompatActivity {
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
     }
 
-    @SuppressLint("MissingPermission")
     private void startLegacyLocationUpdates() {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
+            locationListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    longitude = location.getLongitude();
+                    latitude = location.getLatitude();
+                    getLocationAddress(longitude, latitude);
+                }
+            };
+
+            // Request location updates
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+                // Request the missing permissions from the user
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_CODE);
+                return;
+            }
+
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
         } else {
             Toast.makeText(getApplicationContext(), "Location Services Are Disabled\nPlease enable GPS or " +
                     "network provider", Toast.LENGTH_LONG).show();
         }
+    }
 
-        locationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                longitude = location.getLongitude();
-                latitude = location.getLatitude();
-
-                getLocationAddress(longitude, latitude);
+    // Override the onRequestPermissionsResult() method to handle the permission request result
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, request location updates again
+                startLegacyLocationUpdates();
+            } else {
+                // Permission denied, handle it accordingly (e.g., show a message to the user)
+                Toast.makeText(getApplicationContext(), "Location permission denied", Toast.LENGTH_LONG).show();
             }
-
-        };
-
+        }
     }
 
     private void getLocationAddress(Double longitude, Double latitude) {
@@ -469,6 +503,7 @@ public class AdminSignup extends AppCompatActivity {
         user.put("longitude", "" + latitude);
         user.put("accounttype", "Admin");
         user.put("online", "true");
+        user.put("token", token);
 
         db.collection("users")
                 .document(uid)

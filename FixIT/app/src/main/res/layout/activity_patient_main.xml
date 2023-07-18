@@ -32,11 +32,19 @@
             android:queryHint="Search Medicine..."
             app:searchIcon="@drawable/ic_search" />
 
-        <Spinner
-            android:id="@+id/spinnercat"
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:padding="8dp">
+
+            <Spinner
+                android:id="@+id/spinnercat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:drawable/btn_dropdown" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
@@ -53,7 +61,6 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_alignParentBottom="true"
-        android:layout_margin="9dp"
         android:background="@drawable/background_bottom_nav"
         app:itemIconTint="@color/bottom_nav_color"
         app:itemTextColor="@color/bottom_nav_color"

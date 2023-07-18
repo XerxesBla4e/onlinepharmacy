@@ -134,7 +134,7 @@ public class LoginActivity extends AppCompatActivity {
         userRef = db.collection("users").document(uid);
 
         HashMap<String, Object> hashMap = new HashMap<>();
-        hashMap.put("online", true);
+        hashMap.put("online", "true");
 
         userRef.update(hashMap)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {

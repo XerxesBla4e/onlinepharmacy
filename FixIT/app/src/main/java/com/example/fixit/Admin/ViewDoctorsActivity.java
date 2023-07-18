@@ -14,6 +14,7 @@ import android.widget.Toast;
 import com.example.fixit.Adapter.DoctorAdapter;
 import com.example.fixit.Authentication.LoginActivity;
 import com.example.fixit.Model.DoctorModel;
+import com.example.fixit.Model.Medicine;
 import com.example.fixit.Model.MedicineModel;
 import com.example.fixit.Patient.PatientMainActivity;
 import com.example.fixit.R;
@@ -35,7 +36,6 @@ public class ViewDoctorsActivity extends AppCompatActivity {
 
     ActivityViewDoctorsBinding activityViewDoctorsBinding;
     RecyclerView recyclerView;
-    // DoctorModel doctorModel;
     DoctorAdapter doctorAdapter;
     List<DoctorModel> doctorModelList;
     FirebaseFirestore firestore;
@@ -57,8 +57,6 @@ public class ViewDoctorsActivity extends AppCompatActivity {
         firebaseUser = firebaseAuth.getCurrentUser();
         if (firebaseUser != null) {
             uid1 = firebaseUser.getUid();
-        } else {
-            //   startActivity(new Intent(getApplicationContext(), LoginActivity.class));
         }
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -83,19 +81,22 @@ public class ViewDoctorsActivity extends AppCompatActivity {
                             String uid = documentSnapshot.getString("uid");
                             String image = documentSnapshot.getString("image");
 
-                            // Create a Medicine object and add it to the list
+                            // Create a DoctorModel object and add it to the list
                             DoctorModel doctorModel = new DoctorModel(name, location, specialization, contact, did, timestamp, uid, image);
                             doctorModelList.add(doctorModel);
                         }
 
-                        // Update the adapter with the retrieved medicine list
-                        doctorAdapter.submitList(doctorModelList);
+                        // Update the adapter with the retrieved doctor list
+                        doctorAdapter.setDoctorList(doctorModelList);
+                        if (doctorModelList.isEmpty()) {
+                            Toast.makeText(getApplicationContext(), "No doctors available", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception e) {
-                        // Handle the failure in retrieving medicine items from Firestore
+                        // Handle the failure in retrieving doctor information from Firestore
                         Toast.makeText(getApplicationContext(), "Failed to retrieve Doctor Information: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -111,12 +112,40 @@ public class ViewDoctorsActivity extends AppCompatActivity {
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 if (direction == ItemTouchHelper.RIGHT) {
-
-                    //   Toast.makeText(PatientMainActivity.this, "Cart Item deleted", Toast.LENGTH_SHORT).show();
+                    deleteDoctor(viewHolder);
+                    //Toast.makeText(PatientMainActivity.this, "Cart Item deleted", Toast.LENGTH_SHORT).show();
                 } else {
                 }
             }
         }).attachToRecyclerView(activityViewDoctorsBinding.recyclerView);
+    }
+
+    private void deleteDoctor(RecyclerView.ViewHolder viewHolder) {
+        int position = viewHolder.getAdapterPosition();
+        if (position != RecyclerView.NO_POSITION) {
+            DoctorModel doctorModel = doctorModelList.get(position);
+
+            DocumentReference medicineRef = firestore.collection("users")
+                    .document(uid1)
+                    .collection("Doctor")
+                    .document(doctorModel.getDid());
+
+            medicineRef.delete()
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            Toast.makeText(ViewDoctorsActivity.this, "Doctor deleted", Toast.LENGTH_SHORT).show();
+                            doctorModelList.remove(position);
+                            doctorAdapter.notifyItemRemoved(position);
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Toast.makeText(ViewDoctorsActivity.this, "Failed to delete doctor: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+        }
     }
 
     private void initBottomNavView() {

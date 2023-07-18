@@ -12,8 +12,9 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.example.fixit.Adapter.MedicineA;
-import com.example.fixit.Authentication.LoginActivity;
-import com.example.fixit.Model.MedicineModel;
+import com.example.fixit.Admin.ViewDoctorsActivity;
+import com.example.fixit.Admin.AdminMainActivity;
+import com.example.fixit.Model.Medicine;
 import com.example.fixit.R;
 import com.example.fixit.databinding.ActivityViewMedicineBinding;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -21,85 +22,46 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
-import org.checkerframework.checker.units.qual.A;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class ViewMedicineActivity extends AppCompatActivity {
 
-    ActivityViewMedicineBinding activityViewMedicineBinding;
-    RecyclerView recyclerView;
-    MedicineA medicineA;
-    List<MedicineModel> medicineAList;
-    FirebaseAuth firebaseAuth;
-    FirebaseFirestore firestore;
-    FirebaseUser firebaseUser;
-    String uid1;
-    BottomNavigationView bottomNavigationView;
+    private ActivityViewMedicineBinding activityViewMedicineBinding;
+    private RecyclerView recyclerView;
+    private MedicineA medicineAdapter;
+    private List<Medicine> medicineList;
+    private FirebaseAuth firebaseAuth;
+    private FirebaseFirestore firestore;
+    private FirebaseUser firebaseUser;
+    private String uid1;
+    private BottomNavigationView bottomNavigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         activityViewMedicineBinding = ActivityViewMedicineBinding.inflate(getLayoutInflater());
         setContentView(activityViewMedicineBinding.getRoot());
 
-        initViews(activityViewMedicineBinding);
-
-        firestore = FirebaseFirestore.getInstance();
-        firebaseAuth = FirebaseAuth.getInstance();
-        firebaseUser = firebaseAuth.getCurrentUser();
-        if (firebaseUser != null) {
-            uid1 = firebaseUser.getUid();
-        } else {
-            //   startActivity(new Intent(getApplicationContext(), LoginActivity.class));
-        }
-
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setHasFixedSize(true);
-        recyclerView.setAdapter(medicineA);
-
+        initViews();
+        setupRecyclerView();
         initBottomNavView();
 
-        DocumentReference userRef = firestore.collection("users").document(uid1);
-        userRef.collection("Medicine").get()
-                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-                    @Override
-                    public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
-                        for (QueryDocumentSnapshot documentSnapshot : queryDocumentSnapshots) {
-                            // Retrieve the data from the document snapshot
-                         /*   String name = documentSnapshot.getString("mname");
-                            String category = documentSnapshot.getString("mcategory");
-                            int price = Objects.requireNonNull(documentSnapshot.getLong("mprice")).intValue();
-                            String id = documentSnapshot.getString("mid");
-                            String timestamp = documentSnapshot.getString("timestamp");
-                            String uid = documentSnapshot.getString("uid");
-                            String image = documentSnapshot.getString("image");*/
+        firebaseAuth = FirebaseAuth.getInstance();
+        firestore = FirebaseFirestore.getInstance();
+        firebaseUser = firebaseAuth.getCurrentUser();
 
-                            // Create a Medicine object and add it to the list
-                            MedicineModel medicine = documentSnapshot.toObject(MedicineModel.class);
-                                    //= new MedicineModel(name, category, price, id, timestamp, uid, image);
-                            medicineAList.add(medicine);
-                        }
-
-                        // Update the adapter with the retrieved medicine list
-                        medicineA.submitList(medicineAList);
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        // Handle the failure in retrieving medicine items from Firestore
-                        Toast.makeText(getApplicationContext(), "Failed to retrieve medicine items: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
+        if (firebaseUser != null) {
+            uid1 = firebaseUser.getUid();
+            retrieveMedicines();
+            //Toast.makeText(getApplicationContext(), "" + uid1, Toast.LENGTH_SHORT).show();
+        }
 
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
 
@@ -111,20 +73,24 @@ public class ViewMedicineActivity extends AppCompatActivity {
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 if (direction == ItemTouchHelper.RIGHT) {
-
-                    //   Toast.makeText(PatientMainActivity.this, "Cart Item deleted", Toast.LENGTH_SHORT).show();
+                    deleteMedicineItem(viewHolder);
                 } else {
                 }
             }
-        }).attachToRecyclerView(activityViewMedicineBinding.recyclerView);
-
+        }).attachToRecyclerView(recyclerView);
     }
 
-    private void initViews(ActivityViewMedicineBinding activityViewMedicineBinding) {
-        recyclerView = activityViewMedicineBinding.recyclerView;
-        medicineA = new MedicineA();
-        medicineAList = new ArrayList<>();
+    private void initViews() {
+        recyclerView = activityViewMedicineBinding.recyclerView2;
         bottomNavigationView = activityViewMedicineBinding.bottomNavigationView;
+    }
+
+    private void setupRecyclerView() {
+        medicineList = new ArrayList<>();
+        medicineAdapter = new MedicineA(medicineList);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setAdapter(medicineAdapter);
     }
 
     private void initBottomNavView() {
@@ -145,5 +111,62 @@ public class ViewMedicineActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void retrieveMedicines() {
+        CollectionReference medicineRef = firestore.collection("users")
+                .document(uid1)
+                .collection("Medicine");
+        medicineRef.get()
+                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+                    @Override
+                    public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
+                        for (QueryDocumentSnapshot documentSnapshot : queryDocumentSnapshots) {
+                            Medicine medicine = documentSnapshot.toObject(Medicine.class);
+                            medicineList.add(medicine);
+                        }
+
+                        if (medicineList.isEmpty()) {
+                            Toast.makeText(getApplicationContext(), "No medicine available", Toast.LENGTH_SHORT).show();
+                        }
+
+                        medicineAdapter.notifyDataSetChanged();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(getApplicationContext(), "Failed to retrieve medicine items: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+    }
+
+    private void deleteMedicineItem(RecyclerView.ViewHolder viewHolder) {
+        int position = viewHolder.getAdapterPosition();
+        if (position != RecyclerView.NO_POSITION) {
+            Medicine medicine = medicineList.get(position);
+
+            DocumentReference medicineRef = firestore.collection("users")
+                    .document(uid1)
+                    .collection("Medicine")
+                    .document(medicine.getMId());
+
+            medicineRef.delete()
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            Toast.makeText(ViewMedicineActivity.this, "Medicine deleted", Toast.LENGTH_SHORT).show();
+                            medicineList.remove(position);
+                            medicineAdapter.notifyItemRemoved(position);
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Toast.makeText(ViewMedicineActivity.this, "Failed to delete medicine: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+        }
     }
 }

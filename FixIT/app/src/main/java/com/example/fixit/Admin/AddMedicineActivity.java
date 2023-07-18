@@ -31,9 +31,6 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import org.checkerframework.checker.units.qual.A;
-
-import java.net.URI;
 import java.util.HashMap;
 
 public class AddMedicineActivity extends AppCompatActivity {
@@ -63,16 +60,22 @@ public class AddMedicineActivity extends AppCompatActivity {
 
         initViews(addMedicineBinding);
 
+        firebaseAuth = FirebaseAuth.getInstance();
         firebaseUser = firebaseAuth.getCurrentUser();
         if (firebaseUser != null) {
             uid = firebaseUser.getUid();
+        } else {
+            startActivity(new Intent(AddMedicineActivity.this, LoginActivity.class));
+            finish();
         }
+
         imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 pickMedicineImage();
             }
         });
+
         buttonaddMedicine.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -83,6 +86,9 @@ public class AddMedicineActivity extends AppCompatActivity {
                     progressBar.setVisibility(View.VISIBLE);
 
                     ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    if (progressBar.getParent() != null) {
+                        ((ViewGroup) progressBar.getParent()).removeView(progressBar);
+                    }
                     linearLayout.addView(progressBar, layoutParams);
 
                     uploadMedicine();
@@ -131,15 +137,15 @@ public class AddMedicineActivity extends AppCompatActivity {
         price = addMedicineBinding.nameEditPrice.getText().toString();
 
         if (TextUtils.isEmpty(name)) {
-            addMedicineBinding.mnameEditText.setError("Please Insert Medicine Name");
+            addMedicineBinding.mnameEditText.setError("Please insert medicine name");
             return false;
         }
         if (TextUtils.isEmpty(category)) {
-            addMedicineBinding.nameEditCategory.setError("Please Insert Medicine Category");
+            addMedicineBinding.nameEditCategory.setError("Please insert medicine category");
             return false;
         }
         if (TextUtils.isEmpty(price)) {
-            addMedicineBinding.nameEditPrice.setError("Please Insert Medicine Category");
+            addMedicineBinding.nameEditPrice.setError("Please insert medicine price");
             return false;
         }
 
@@ -147,8 +153,6 @@ public class AddMedicineActivity extends AppCompatActivity {
     }
 
     private void uploadMedicine() {
-        // Your other code
-
         final String timestamp = "" + System.currentTimeMillis();
         name = addMedicineBinding.mnameEditText.getText().toString();
         category = addMedicineBinding.nameEditCategory.getText().toString();
@@ -157,13 +161,12 @@ public class AddMedicineActivity extends AppCompatActivity {
 
         if (uri == null) {
             HashMap<String, Object> hashMap = new HashMap<>();
-            // Set values to the hashMap
             hashMap.put("mname", name);
             hashMap.put("mcategory", category);
             hashMap.put("mprice", price);
             hashMap.put("mid", timestamp);
             hashMap.put("mtimestamp", timestamp);
-            hashMap.put("muid", firebaseAuth.getUid());//use me for shop name logic
+            hashMap.put("muid", firebaseAuth.getUid());
             hashMap.put("mimage", "");
 
             DocumentReference userRef = firestore.collection("users").document(uid);
@@ -178,14 +181,11 @@ public class AddMedicineActivity extends AppCompatActivity {
                     .addOnFailureListener(new OnFailureListener() {
                         @Override
                         public void onFailure(@NonNull Exception e) {
-                            // progressDialog.dismiss();=====
                             progressBar.setVisibility(View.GONE);
                             Toast.makeText(getApplicationContext(), "" + e.getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     });
         } else {
-            // Your other code
-
             StorageReference filepath = storageReference.child("imagePost").child(uri.getLastPathSegment());
             filepath.putFile(uri).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                 @Override
@@ -194,30 +194,27 @@ public class AddMedicineActivity extends AppCompatActivity {
                         @Override
                         public void onComplete(@NonNull Task<Uri> task) {
                             HashMap<String, Object> hashMap = new HashMap<>();
-                            // Set values to the hashMap
                             hashMap.put("mname", name);
                             hashMap.put("mcategory", category);
                             hashMap.put("mprice", price);
                             hashMap.put("mid", timestamp);
                             hashMap.put("mtimestamp", timestamp);
-                            hashMap.put("muid", firebaseAuth.getUid());//use me for shop name logic
+                            hashMap.put("muid", firebaseAuth.getUid());
                             hashMap.put("mimage", "" + task.getResult().toString());
-
 
                             DocumentReference userRef = firestore.collection("users").document(uid);
                             userRef.collection("Medicine").document(timestamp).set(hashMap)
                                     .addOnSuccessListener(new OnSuccessListener<Void>() {
                                         @Override
                                         public void onSuccess(Void aVoid) {
-                                            //  progressDialog.dismiss();
                                             progressBar.setVisibility(View.GONE);
                                             Toast.makeText(getApplicationContext(), "Medicine Added...", Toast.LENGTH_SHORT).show();
+
                                         }
                                     })
                                     .addOnFailureListener(new OnFailureListener() {
                                         @Override
                                         public void onFailure(@NonNull Exception e) {
-                                            //   progressDialog.dismiss();
                                             progressBar.setVisibility(View.GONE);
                                             Toast.makeText(getApplicationContext(), "" + e.getMessage(), Toast.LENGTH_SHORT).show();
                                         }
@@ -228,12 +225,11 @@ public class AddMedicineActivity extends AppCompatActivity {
             });
         }
     }
+
     @Override
     public void onBackPressed() {
         Intent intent = new Intent(getApplicationContext(), AdminMainActivity.class);
         startActivity(intent);
-        // super.onBackPressed();
-        // Finish the current activity
         finish();
     }
 }

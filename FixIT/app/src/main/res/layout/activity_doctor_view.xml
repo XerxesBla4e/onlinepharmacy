@@ -7,10 +7,10 @@
     tools:context=".Patient.DoctorViewActivity">
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+        android:id="@+id/recyclerView0"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:listitem="@layout/doctor_view_item" />
+        tools:listitem="@layout/item_doctor" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"

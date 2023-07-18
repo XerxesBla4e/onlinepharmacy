@@ -6,13 +6,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,7 +35,6 @@ import com.example.fixit.R;
 import com.example.fixit.databinding.ActivityUpdateProfileBinding;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
@@ -74,6 +74,7 @@ public class UpdateProfile extends AppCompatActivity {
     private static int UPDATE_INTERVAL = 5000;
     private static int FASTEST_INTERVAL = 3000;
     private static final int MY_PERMISSION_REQUEST_CODE = 71;
+    private static final int PERMISSION_REQUEST_CODE = 444;
 
     private static final String TAG = "dd";
     ActivityUpdateProfileBinding activityUpdateProfileBinding;
@@ -168,8 +169,6 @@ public class UpdateProfile extends AppCompatActivity {
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION
             }, MY_PERMISSION_REQUEST_CODE);
-        } else {
-            // displayLocation();
         }
     }
 
@@ -357,28 +356,46 @@ public class UpdateProfile extends AppCompatActivity {
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
     }
 
-    @SuppressLint("MissingPermission")
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, request location updates again
+                startLegacyLocationUpdates();
+            } else {
+                // Permission denied, handle it accordingly (e.g., show a message to the user)
+                Toast.makeText(getApplicationContext(), "Location permission denied", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
     private void startLegacyLocationUpdates() {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, (android.location.LocationListener) locationListener);
+            locationListener = new android.location.LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    longitude = location.getLongitude();
+                    latitude = location.getLatitude();
+                    getLocationAddress(longitude, latitude);
+                }
+            };
+
+            // Request location updates
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+                // Request the missing permissions from the user
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_CODE);
+                return;
+            }
+
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
         } else {
             Toast.makeText(getApplicationContext(), "Location Services Are Disabled\nPlease enable GPS or " +
                     "network provider", Toast.LENGTH_LONG).show();
         }
-
-        locationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                longitude = location.getLongitude();
-                latitude = location.getLatitude();
-
-                getLocationAddress(longitude, latitude);
-            }
-
-        };
-
     }
 
     private void getLocationAddress(Double longitude, Double latitude) {
@@ -387,7 +404,7 @@ public class UpdateProfile extends AppCompatActivity {
             List<Address> addressList = geocoder.getFromLocation(latitude, longitude, 1);
             address = addressList.get(0).getAddressLine(0);
 
-            Toast.makeText(getApplicationContext(), "Address: " + address, Toast.LENGTH_SHORT).show();
+        //    Toast.makeText(getApplicationContext(), "Address: " + address, Toast.LENGTH_SHORT).show();
             activityUpdateProfileBinding.etLocation.setText(address);
             city = addressList.get(0).getLocality();//city
             state = addressList.get(0).getAdminArea();//region

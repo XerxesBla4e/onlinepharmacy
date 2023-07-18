@@ -5,13 +5,21 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -53,9 +61,7 @@ import java.util.Map;
 
 public class AdminMainActivity extends AppCompatActivity {
 
-
     BottomNavigationView bottomNavigationView;
-    //private RecyclerView transactionRecView;
     public FloatingActionButton floatingActionButton;
     public Toolbar toolbar;
     ActivityAdminMainBinding activityAdminMainBinding;
@@ -67,6 +73,9 @@ public class AdminMainActivity extends AppCompatActivity {
     FirebaseFirestore firestore;
     FirebaseUser firebaseUser;
     String uid1;
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private static final String TAG = "Location";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,7 +83,6 @@ public class AdminMainActivity extends AppCompatActivity {
 
         activityAdminMainBinding = ActivityAdminMainBinding.inflate(getLayoutInflater());
         setContentView(activityAdminMainBinding.getRoot());
-
 
         toolbar = activityAdminMainBinding.toolbar;
         floatingActionButton = activityAdminMainBinding.fbAddTransaction;
@@ -94,25 +102,41 @@ public class AdminMainActivity extends AppCompatActivity {
 
         initViews(activityAdminMainBinding);
 
-        firestore = FirebaseFirestore.getInstance();
         firebaseAuth = FirebaseAuth.getInstance();
-        firebaseUser = firebaseAuth.getCurrentUser();
-        uid1 = firebaseUser.getUid();
 
-        //    checkUser();
+        firebaseAuth.addAuthStateListener(new FirebaseAuth.AuthStateListener() {
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user != null) {
+                    uid1 = user.getUid();
+                    retrieveOrders();
+                    requestLocationUpdates();
+                } else {
+                    startActivity(new Intent(AdminMainActivity.this, LoginActivity.class));
+                    finish();
+                }
+            }
+        });
+    }
+
+    private void retrieveOrders() {
+        firestore = FirebaseFirestore.getInstance();
 
         mainOrder.OnMoveToPatient(new OnMoveToPatientDets() {
             @Override
             public void onMoveToDets(Orders ordersmodel) {
-                // Handle the click event, for example, navigate to doctor details screen
                 Intent intent = new Intent(getApplicationContext(), PatientDetailsActivity.class);
                 intent.putExtra("ordersModel", ordersmodel);
                 startActivity(intent);
             }
         });
-        CollectionReference ordersRef = FirebaseFirestore.getInstance().collection("users")
+
+        CollectionReference ordersRef = firestore.collection("users")
                 .document(uid1)
                 .collection("orders");
+
+        ordersList = new ArrayList<>();
 
         ordersRef.get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
@@ -121,20 +145,16 @@ public class AdminMainActivity extends AppCompatActivity {
                     QuerySnapshot querySnapshot = task.getResult();
                     if (querySnapshot != null) {
                         for (DocumentSnapshot document : querySnapshot.getDocuments()) {
-                            // Handle each order document here
                             String orderID = document.getString("orderID");
                             String orderTime = document.getString("orderTime");
                             String orderStatus = document.getString("orderStatus");
                             String patient = document.getString("orderBy");
-                            // Retrieve other order details as needed
-                            // Create a Medicine object and add it to the list
                             Orders orders = new Orders(orderID, orderTime, orderStatus, patient);
                             ordersList.add(orders);
                         }
                         mainOrder.submitList(ordersList);
                     }
                 } else {
-                    // Handle the error
                     Exception exception = task.getException();
                     if (exception != null) {
                         // Log or display the error message
@@ -142,7 +162,61 @@ public class AdminMainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
 
+
+    private void requestLocationUpdates() {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                updateUserLocation(location.getLatitude(), location.getLongitude());
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+            }
+        };
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        }
+    }
+
+    private void updateUserLocation(double latitude, double longitude) {
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        DocumentReference documentRef = firestore.collection("users").document(uid1);
+
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("latitude", ""+latitude);
+        updateData.put("longitude", ""+longitude);
+
+        documentRef.update(updateData)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        // Update successful
+                        // Toast.makeText(getApplicationContext(), "Location updated", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.d(TAG, "" + e);
+                        // Handle any errors
+                        // Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     private void initViews(ActivityAdminMainBinding activityAdminMainBinding) {
@@ -162,11 +236,11 @@ public class AdminMainActivity extends AppCompatActivity {
             public void onNavigationItemReselected(MenuItem item) {
                 if (item.getItemId() == R.id.item_doctors) {
                     Intent x = new Intent(AdminMainActivity.this, ViewDoctorsActivity.class);
-                    x.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                  //  x.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(x);
                 } else if (item.getItemId() == R.id.item_medicine) {
                     Intent x6 = new Intent(AdminMainActivity.this, ViewMedicineActivity.class);
-                    x6.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                  //  x6.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(x6);
                 } else {
                     Toast.makeText(getApplicationContext(), "In progress", Toast.LENGTH_SHORT).show();
@@ -181,6 +255,11 @@ public class AdminMainActivity extends AppCompatActivity {
         return true;
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        locationManager.removeUpdates(locationListener);
+    }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
@@ -219,31 +298,29 @@ public class AdminMainActivity extends AppCompatActivity {
             startActivity(new Intent(AdminMainActivity.this, LoginActivity.class));
             finish();
         }
-        return super.onOptionsItemSelected(item);
+        return true;
     }
 
     private void makeOffline() {
-        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
-        DocumentReference documentRef = firestore.collection("Users").document(uid1);
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser != null) {
+            String uid = currentUser.getUid();
+            DocumentReference userRef = firestore.collection("users").document(uid);
 
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put("online", "false");
-
-        documentRef.update(updateData)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        // Update successful
-                        Toast.makeText(getApplicationContext(), "Logged Out", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        // Handle any errors
-                        Toast.makeText(getApplicationContext(), e.getMessage() + "", Toast.LENGTH_SHORT).show();
-                    }
-                });
-
+            userRef.update("online", "false")
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            // Successfully updated the user's online status
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            // Failed to update the user's online status
+                        }
+                    });
+        }
     }
+
 }

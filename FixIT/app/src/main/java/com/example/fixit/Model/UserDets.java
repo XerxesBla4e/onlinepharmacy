@@ -19,11 +19,21 @@ public class UserDets {
     private String accounttype;
     private String online;
 
+    private String token;
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
     public UserDets() {
         // Default constructor required for Firebase
     }
 
-    public UserDets(String uid, String name, String age, String email, String phonenumber, String location, String city, String state, String country, String district, String gender, String DOB, String timestamp, String latitude, String longitude, String accounttype, String online) {
+    public UserDets(String uid, String name, String age, String email, String phonenumber, String location, String city, String state, String country, String district, String gender, String DOB, String timestamp, String latitude, String longitude, String accounttype, String online,String token) {
         this.uid = uid;
         this.name = name;
         this.age = age;
@@ -41,6 +51,7 @@ public class UserDets {
         this.longitude = longitude;
         this.accounttype = accounttype;
         this.online = online;
+        this.token = token;
     }
 
     public String getUid() {

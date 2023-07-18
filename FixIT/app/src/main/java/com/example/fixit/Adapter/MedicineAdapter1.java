@@ -18,80 +18,75 @@ import com.squareup.picasso.Picasso;
 
 import java.util.Objects;
 
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.TextView;
+public class MedicineAdapter1 extends ListAdapter<Medicinecart, MedicineAdapter1.MedicineViewHolder> {
 
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
-
-import com.example.fixit.Model.Medicine;
-import com.example.fixit.R;
-import com.squareup.picasso.Picasso;
-
-import java.util.List;
-
-public class MedicineA extends RecyclerView.Adapter<MedicineA.ViewHolder> {
-
-    private List<Medicine> medicineList;
-
-    public MedicineA(List<Medicine> medicineList) {
-        this.medicineList = medicineList;
+    public MedicineAdapter1() {
+        super(CALLBACK);
     }
+
+    private static final DiffUtil.ItemCallback<Medicinecart> CALLBACK = new DiffUtil.ItemCallback<Medicinecart>() {
+        @Override
+        public boolean areItemsTheSame(@NonNull Medicinecart oldItem, @NonNull Medicinecart newItem) {
+            return Objects.equals(oldItem.getId(), newItem.getId());
+        }
+
+        @Override
+        public boolean areContentsTheSame(@NonNull Medicinecart oldItem, @NonNull Medicinecart newItem) {
+            return oldItem.getMName().equals(newItem.getMName())
+                    && oldItem.getMCategory().equals(newItem.getMCategory())
+                    && Objects.equals(oldItem.getMPrice(), newItem.getMPrice())
+                    && oldItem.getMTimestamp().equals(newItem.getMTimestamp())
+                    && oldItem.getMUid().equals(newItem.getMUid())
+                    && oldItem.getMImage().equals(newItem.getMImage());
+        }
+    };
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public MedicineViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.medicine_view_item, parent, false);
-        return new ViewHolder(view);
+        return new MedicineViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        Medicine medicine = medicineList.get(position);
+    public void onBindViewHolder(@NonNull MedicineViewHolder holder, int position) {
+        Medicinecart medicine = getItem(position);
         holder.bind(medicine);
     }
-    public Medicine getMed(int position) {
-        if (position >= 0 && position < medicineList.size()) {
-            return medicineList.get(position);
-        }
-        return null;
-    }
-    @Override
-    public int getItemCount() {
-        return medicineList.size();
+
+    public Medicinecart getMed(int position) {
+        return getItem(position);
     }
 
-    public class ViewHolder extends RecyclerView.ViewHolder {
-        private ImageView imageView;
+    public void clearCart() {
+        submitList(null);
+    }
+
+    public class MedicineViewHolder extends RecyclerView.ViewHolder {
         private TextView nameTextView;
         private TextView categoryTextView;
         private TextView priceTextView;
+        private ImageView imageView;
 
-        public ViewHolder(@NonNull View itemView) {
+        public MedicineViewHolder(@NonNull View itemView) {
             super(itemView);
-            imageView = itemView.findViewById(R.id.medimage);
             nameTextView = itemView.findViewById(R.id.tvName);
             categoryTextView = itemView.findViewById(R.id.tvCategory);
             priceTextView = itemView.findViewById(R.id.tvPrice);
+            imageView = itemView.findViewById(R.id.medimage);
         }
 
-        public void bind(Medicine medicine) {
+        public void bind(Medicinecart medicine) {
             nameTextView.setText(medicine.getMName());
             categoryTextView.setText(medicine.getMCategory());
             priceTextView.setText(medicine.getMPrice());
-
-            // Load image using Picasso library
-            // Picasso.get().load(medicine.getMImage()).into(imageView);
             String imagePath = medicine.getMImage();
             try {
                 if (imagePath != null && !imagePath.isEmpty()) {
                     Picasso.get().load(imagePath).into(imageView);
                 } else {
                     // Load a default image from the mipmap folder
-                     imageView.setImageResource(R.mipmap.ic_launcher);
+                    imageView.setImageResource(R.mipmap.ic_launcher);
                 }
             } catch (IllegalArgumentException e) {
                 // Exception occurred, handle it
@@ -99,14 +94,6 @@ public class MedicineA extends RecyclerView.Adapter<MedicineA.ViewHolder> {
                 // Load a default image from the mipmap folder
                 imageView.setImageResource(R.mipmap.ic_launcher);
             }
-
-            // Handle click events or any other operations for the item here
-            itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    // Handle item click event
-                }
-            });
         }
     }
 }

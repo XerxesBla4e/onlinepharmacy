@@ -2,38 +2,41 @@ package com.example.fixit.Patient;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import com.example.fixit.Adapter.Doctor;
+import com.example.fixit.Adapter.DoctorAd;
 import com.example.fixit.Interface.OnMoveToDets;
 import com.example.fixit.Model.DoctorModel;
+import com.example.fixit.Patient.PharmacyActivity;
 import com.example.fixit.R;
 import com.example.fixit.databinding.ActivityDoctorViewBinding;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.squareup.picasso.Picasso;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class DoctorViewActivity extends AppCompatActivity {
+public class DoctorViewActivity extends AppCompatActivity implements OnMoveToDets {
 
     ActivityDoctorViewBinding activityDoctorViewBinding;
     RecyclerView recyclerView;
     FirebaseFirestore firestore;
-    FirebaseAuth firebaseAuth;
-    List<DoctorModel> doctorModelList;
-    Doctor doctoradapter;
+    public List<DoctorModel> doctorModelList;
+    DoctorAd doctorAdapter;
 
     BottomNavigationView bottomNavigationView;
 
@@ -48,62 +51,65 @@ public class DoctorViewActivity extends AppCompatActivity {
 
         initBottomNavView();
 
-        firebaseAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
 
-        doctoradapter.setOnMoveToDets(new OnMoveToDets() {
-            @Override
-            public void onMoveToDets(DoctorModel doctorModel) {
-                // Handle the click event, for example, navigate to patient details screen
-                Intent intent = new Intent(getApplicationContext(), PharmacyActivity.class);
-                intent.putExtra("doctorModel", doctorModel);
-                startActivity(intent);
-            }
-        });
+        doctorAdapter.setOnMoveToDets(this);
 
-        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        retrieveDoctors();
+    }
 
-        firestore.collection("users")
-                .whereEqualTo("accounttype", "Admin")
+    private void retrieveDoctors() {
+        String desiredAccountType = "Admin";
+
+        CollectionReference usersRef = firestore.collection("users");
+
+        usersRef.whereEqualTo("accounttype", desiredAccountType)
                 .get()
                 .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
                     @Override
                     public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
-                        for (QueryDocumentSnapshot documentSnapshot : queryDocumentSnapshots) {
-                         /*   String name = documentSnapshot.getString("name");
-                            String location = documentSnapshot.getString("location");
-                            String specialization = documentSnapshot.getString("specialization");
-                            String contact = documentSnapshot.getString("contact");
-                            String did = documentSnapshot.getString("did");
-                            String timestamp = documentSnapshot.getString("timestamp");
-                            String uid = documentSnapshot.getString("uid");
-                            String image = documentSnapshot.getString("image")*/
+                        doctorModelList.clear(); // Clear the list before adding new data
 
-                            // Create a DoctorModel object and do further processing
-                            DoctorModel doctor = documentSnapshot.toObject(DoctorModel.class);
-                            //= new DoctorModel(name, location, specialization, contact, did, timestamp, uid, image);
-                            // Process the retrieved doctor object as needed
-                            doctorModelList.add(doctor);
+                        for (QueryDocumentSnapshot userDocument : queryDocumentSnapshots) {
+                            String userId = userDocument.getId();
+
+                            CollectionReference doctorRef = usersRef.document(userId)
+                                    .collection("Doctor");
+
+                            doctorRef.get().addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+                                @Override
+                                public void onSuccess(QuerySnapshot querySnapshot) {
+                                    for (QueryDocumentSnapshot doctorDocument : querySnapshot) {
+                                        DoctorModel doctor = doctorDocument.toObject(DoctorModel.class);
+                                        doctorModelList.add(doctor);
+                                    }
+
+                                    doctorAdapter.setDoctorList(doctorModelList); // Set the retrieved doctor list to the adapter
+                                    doctorAdapter.notifyDataSetChanged(); // Update the RecyclerView
+
+
+                                 //   Toast.makeText(getApplicationContext(), ""+doctorModelList.size(), Toast.LENGTH_SHORT).show();
+
+                                }
+                            });
                         }
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception e) {
-                        // Handle the failure in retrieving doctors from Firestore
-                        Toast.makeText(getApplicationContext(), "No Doctors Available: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.d("TAG", "Error getting doctors: " + e.getMessage());
                     }
                 });
-
     }
 
     private void initBottomNavView() {
-        bottomNavigationView.setSelectedItemId(R.id.item_doctors);
+        bottomNavigationView.setSelectedItemId(R.id.item_home);
         bottomNavigationView.setOnNavigationItemReselectedListener(new BottomNavigationView.OnNavigationItemReselectedListener() {
             @Override
             public void onNavigationItemReselected(MenuItem item) {
                 if (item.getItemId() == R.id.item_home) {
-                    Intent x = new Intent(DoctorViewActivity.this, DoctorViewActivity.class);
+                    Intent x = new Intent(DoctorViewActivity.this, PatientMainActivity.class);
                     x.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(x);
                 } else if (item.getItemId() == R.id.item_cart) {
@@ -118,9 +124,19 @@ public class DoctorViewActivity extends AppCompatActivity {
     }
 
     private void initViews(ActivityDoctorViewBinding activityDoctorViewBinding) {
-        recyclerView = activityDoctorViewBinding.recyclerView;
-        doctoradapter = new Doctor();
+        recyclerView = activityDoctorViewBinding.recyclerView0;
         doctorModelList = new ArrayList<>();
+        doctorAdapter = new DoctorAd(getApplicationContext(), doctorModelList);
+        recyclerView.setAdapter(doctorAdapter);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
         bottomNavigationView = activityDoctorViewBinding.bottomNavigationView;
+    }
+
+    @Override
+    public void onMoveToDets(DoctorModel doctorModel) {
+        // Handle the click event, for example, navigate to patient details screen
+        Intent intent = new Intent(getApplicationContext(), PharmacyActivity.class);
+        intent.putExtra("doctorModel", doctorModel);
+        startActivity(intent);
     }
 }
